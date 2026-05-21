@@ -1,0 +1,38 @@
+{
+    "name": "klickmanufaktur/statamic-cp-tree",
+    "description": "Reusable Statamic control panel collection tree replacement.",
+    "keywords": [
+        "statamic",
+        "addon",
+        "control-panel",
+        "tree"
+    ],
+    "license": "proprietary",
+    "type": "statamic-addon",
+    "homepage": "https://github.com/klickmanufaktur/statamic-cp-tree",
+    "support": {
+        "source": "https://github.com/klickmanufaktur/statamic-cp-tree"
+    },
+    "autoload": {
+        "psr-4": {
+            "StatamicCpTree\\": "src"
+        }
+    },
+    "require": {
+        "php": "^8.2",
+        "statamic/cms": "^6.0"
+    },
+    "extra": {
+        "statamic": {
+            "name": "CP Tree",
+            "slug": "statamic-cp-tree",
+            "description": "Reusable Statamic control panel collection tree replacement."
+        },
+        "laravel": {
+            "providers": [
+                "StatamicCpTree\\ServiceProvider"
+            ]
+        }
+    },
+    "prefer-stable": true
+}
