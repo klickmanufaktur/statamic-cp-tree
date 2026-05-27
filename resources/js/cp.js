@@ -1,7 +1,22 @@
 import { bootStatamicCpTree } from './boot';
+import PageLinkFieldtype from './PageLinkFieldtype.vue';
+
+function registerComponents() {
+    const config = Statamic.$config.get('statamicCpTree') || {};
+
+    if (config.pageLinkCollection) {
+        Statamic.$components.register('link-fieldtype', PageLinkFieldtype);
+    }
+}
+
+function boot() {
+    bootStatamicCpTree();
+}
 
 if (Statamic.$app) {
-    bootStatamicCpTree();
+    registerComponents();
+    boot();
 } else {
-    Statamic.booted(bootStatamicCpTree);
+    Statamic.booting(registerComponents);
+    Statamic.booted(boot);
 }

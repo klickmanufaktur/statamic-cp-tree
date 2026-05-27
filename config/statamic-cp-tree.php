@@ -15,6 +15,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Page Link Collection
+    |--------------------------------------------------------------------------
+    |
+    | Collection handle used by the link fieldtype's page picker. Set this to
+    | null to leave Statamic's default link fieldtype untouched.
+    |
+    */
+    'page_link_collection' => 'pages',
+
+    /*
+    |--------------------------------------------------------------------------
     | Optional Access Resolver
     |--------------------------------------------------------------------------
     |

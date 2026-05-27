@@ -178,6 +178,10 @@ function syncTreeMount() {
     const statamicTree = document.querySelector('.page-tree');
     const statamicTreePanel = statamicTree?.closest('[data-ui-panel]');
 
+    if (pagesTreeApp && !pagesTreeMount?.isConnected) {
+        resetDisconnectedTree();
+    }
+
     if (pagesTreeApp) {
         hideStatamicTreePanel(statamicTreePanel);
         return;
@@ -231,6 +235,21 @@ function injectTree(insertBeforeElement, props, statamicTreePanel = null) {
     Object.assign(pagesTreeApp._context.provides, Statamic.$app._context.provides);
     Object.assign(pagesTreeApp.config.globalProperties, Statamic.$app.config.globalProperties);
     pagesTreeApp.mount(pagesTreeMount);
+}
+
+function resetDisconnectedTree() {
+    if (pagesTreeApp) {
+        pagesTreeApp.unmount();
+        pagesTreeApp = null;
+    }
+
+    pagesTreeMount = null;
+
+    if (hiddenStatamicTreePanel?.isConnected) {
+        hiddenStatamicTreePanel.hidden = false;
+    }
+
+    hiddenStatamicTreePanel = null;
 }
 
 function destroyTree() {
