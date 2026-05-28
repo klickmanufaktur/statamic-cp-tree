@@ -9,7 +9,9 @@ let hiddenStatamicTreePanel = null;
 let pagesTreeObserver = null;
 let pagesTreeSyncQueued = false;
 let pagesTreeSyncTimer = null;
+let mountedTreeContextKey = null;
 const pagesTreeInFlightRequests = new Map();
+const collectionSiteOverrides = new Map();
 
 export function bootStatamicCpTree() {
     if (pagesTreeInjectorBooted) return;
@@ -82,10 +84,13 @@ function installTreeRequestDedupe() {
     const originalGet = axios.get.bind(axios);
 
     axios.get = (url, config) => {
-        if (!isCollectionTreeRequest(url)) {
+        const treeRequest = parseCollectionTreeRequest(url);
+
+        if (!treeRequest) {
             return originalGet(url, config);
         }
 
+        rememberCollectionTreeSite(treeRequest);
         const key = String(url);
 
         if (pagesTreeInFlightRequests.has(key)) {
@@ -104,18 +109,44 @@ function installTreeRequestDedupe() {
     axios.get.__statamicCpTreeDedupe = true;
 }
 
-function isCollectionTreeRequest(url) {
+function parseCollectionTreeRequest(url) {
     try {
         const cpRoot = String(Statamic.$config.get('cpRoot') || '/cp').replace(/^\/|\/$/g, '');
-        const segments = new URL(url, window.location.origin).pathname.split('/').filter(Boolean);
+        const parsedUrl = new URL(url, window.location.origin);
+        const segments = parsedUrl.pathname.split('/').filter(Boolean);
         const cpIndex = segments.indexOf(cpRoot);
-
-        return cpIndex !== -1
+        const isTreeRequest = cpIndex !== -1
             && segments[cpIndex + 1] === 'collections'
             && segments[cpIndex + 3] === 'tree';
+
+        if (!isTreeRequest) {
+            return null;
+        }
+
+        return {
+            collection: segments[cpIndex + 2],
+            site: parsedUrl.searchParams.get('site'),
+        };
     } catch (error) {
-        return false;
+        return null;
     }
+}
+
+function rememberCollectionTreeSite(treeRequest) {
+    if (!treeRequest.collection || !treeRequest.site) {
+        return;
+    }
+
+    if (!isEnabledCollection(treeRequest.collection)) {
+        return;
+    }
+
+    if (collectionSiteOverrides.get(treeRequest.collection) === treeRequest.site) {
+        return;
+    }
+
+    collectionSiteOverrides.set(treeRequest.collection, treeRequest.site);
+    queueTreeSync(0);
 }
 
 function currentInertiaProps() {
@@ -182,6 +213,12 @@ function syncTreeMount() {
         resetDisconnectedTree();
     }
 
+    const treeContextKey = currentTreeContextKey(props);
+
+    if (pagesTreeApp && mountedTreeContextKey !== treeContextKey) {
+        destroyTree();
+    }
+
     if (pagesTreeApp) {
         hideStatamicTreePanel(statamicTreePanel);
         return;
@@ -200,6 +237,19 @@ function currentCollectionView(props) {
     const view = Statamic.$preferences?.get?.(`collections.${props.handle}.view`);
 
     return view || 'tree';
+}
+
+function currentTreeContextKey(props) {
+    return [
+        props.handle,
+        currentSiteForProps(props),
+        props.structurePagesUrl,
+        props.structureSubmitUrl,
+    ].map((value) => value || '').join('|');
+}
+
+function currentSiteForProps(props) {
+    return collectionSiteOverrides.get(props.handle) || props.initialSite;
 }
 
 function findTreeInsertBeforeElement() {
@@ -229,7 +279,13 @@ function injectTree(insertBeforeElement, props, statamicTreePanel = null) {
     insertBeforeElement.before(pagesTreeMount);
     hideStatamicTreePanel(statamicTreePanel);
 
-    pagesTreeApp = createApp(PagesTree, { pageProps: props, addonConfig: addonConfig() });
+    const treeProps = {
+        ...props,
+        initialSite: currentSiteForProps(props),
+    };
+
+    pagesTreeApp = createApp(PagesTree, { pageProps: treeProps, addonConfig: addonConfig() });
+    mountedTreeContextKey = currentTreeContextKey(treeProps);
     Object.assign(pagesTreeApp._context.components, Statamic.$app._context.components);
     Object.assign(pagesTreeApp._context.directives, Statamic.$app._context.directives);
     Object.assign(pagesTreeApp._context.provides, Statamic.$app._context.provides);
@@ -243,6 +299,7 @@ function resetDisconnectedTree() {
         pagesTreeApp = null;
     }
 
+    mountedTreeContextKey = null;
     pagesTreeMount = null;
 
     if (hiddenStatamicTreePanel?.isConnected) {
@@ -258,6 +315,7 @@ function destroyTree() {
         pagesTreeApp = null;
     }
 
+    mountedTreeContextKey = null;
     pagesTreeMount?.remove();
     pagesTreeMount = null;
 
