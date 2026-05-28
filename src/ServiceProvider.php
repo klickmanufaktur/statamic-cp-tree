@@ -25,6 +25,7 @@ class ServiceProvider extends AddonServiceProvider
             'statamicCpTree' => fn (): array => [
                 'collections' => config('statamic-cp-tree.collections', []),
                 'flagsUrl' => cp_route('statamic-cp-tree.flags'),
+                'hideRootUrlCollections' => config('statamic-cp-tree.hide_root_url_collections', []),
                 'pageLinkCollection' => config('statamic-cp-tree.page_link_collection', 'pages'),
                 'pageLinkTreeUrl' => cp_route('statamic-cp-tree.page-link-tree'),
             ],

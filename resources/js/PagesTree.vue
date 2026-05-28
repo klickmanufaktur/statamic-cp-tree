@@ -3,6 +3,7 @@
         <PanelHeader class="statamic-cp-tree__header">
             <div class="statamic-cp-tree__header-main">
                 <Button
+                    v-if="!hideRootUrl"
                     class="statamic-cp-tree__root-url"
                     :href="rootUrl"
                     target="_blank"
@@ -767,6 +768,10 @@ export default {
 
         collectionHandle() {
             return this.pageProps.handle;
+        },
+
+        hideRootUrl() {
+            return (this.addonConfig.hideRootUrlCollections || []).includes(this.collectionHandle);
         },
 
         pagesUrl() {
