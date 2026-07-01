@@ -596,6 +596,11 @@
     gap: 0.375rem;
 }
 
+.page-link-fieldtype__site-select {
+    flex: 0 0 auto;
+    min-width: 9rem;
+}
+
 .page-node-access-fieldtype__scroll {
     max-height: 32rem;
     overflow: auto;

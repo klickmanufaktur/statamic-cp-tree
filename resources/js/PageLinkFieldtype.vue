@@ -81,6 +81,12 @@
             <StackContent inset>
                 <div class="statamic-cp-tree page-link-fieldtype__tree">
                     <div class="page-node-access-fieldtype__header page-node-access-fieldtype__header--stack">
+                        <Select
+                            v-if="sites.length > 1"
+                            class="page-link-fieldtype__site-select"
+                            :options="siteOptions"
+                            v-model="selectedSite"
+                        />
                         <Input
                             class="page-node-access-fieldtype__search"
                             v-model="searchQuery"
@@ -298,6 +304,8 @@ export default {
             selectedAssets: this.meta.initialSelectedAssets,
             metaChanging: false,
             pages: [],
+            sites: [],
+            selectedSite: null,
             pageTreeSite: 'default',
             pageTreeLoading: false,
             pageTreeError: null,
@@ -369,6 +377,10 @@ export default {
             this.collectOpenIds(this.displayPages, ids);
 
             return ids;
+        },
+
+        siteOptions() {
+            return this.sites.map((site) => ({ value: site.handle, label: site.name }));
         },
 
         replicatorPreview() {
@@ -452,6 +464,14 @@ export default {
             this.selectedAssets = meta.initialSelectedAssets;
             this.$nextTick(() => (this.metaChanging = false));
         },
+
+        selectedSite(site, oldSite) {
+            if (! oldSite || site === oldSite) {
+                return;
+            }
+
+            this.loadPages(site);
+        },
     },
 
     created() {
@@ -489,17 +509,19 @@ export default {
             ].filter((option) => option);
         },
 
-        async loadPages() {
+        async loadPages(site = this.selectedSite) {
             this.pageTreeLoading = true;
             this.pageTreeError = null;
 
             try {
                 const config = Statamic.$config.get('statamicCpTree') || {};
                 const url = config.pageLinkTreeUrl || cp_url('api/statamic-cp-tree/page-link-tree');
-                const response = await this.$axios.get(url);
+                const response = await this.$axios.get(url, { params: site ? { site } : {} });
 
                 this.pages = response.data.pages || [];
+                this.sites = response.data.sites || [];
                 this.pageTreeSite = response.data.site || 'default';
+                this.selectedSite = this.pageTreeSite;
                 this.openIds = this.initialOpenIds(this.pages);
 
                 if (this.option === 'entry' && this.selectedPageNode) {

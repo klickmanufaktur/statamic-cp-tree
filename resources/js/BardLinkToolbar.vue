@@ -83,6 +83,7 @@
             <StackContent inset>
                 <div class="statamic-cp-tree page-link-fieldtype__tree">
                     <div class="page-node-access-fieldtype__header page-node-access-fieldtype__header--stack">
+                        <Select v-if="sites.length > 1" class="page-link-fieldtype__site-select" :options="siteOptions" v-model="selectedSite" />
                         <Input class="page-node-access-fieldtype__search" v-model="searchQuery" icon-prepend="magnifying-glass" placeholder="Seiten suchen" clearable :append="searchAppendText" />
                         <div class="page-node-access-fieldtype__tools">
                             <Button size="sm" icon="tree-collapse" text="Alle schließen" @click="collapseAll" />
@@ -259,6 +260,8 @@ export default {
             targetBlank: false,
             isLoading: false,
             pages: [],
+            sites: [],
+            selectedSite: null,
             pageTreeSite: 'default',
             pageTreeLoading: false,
             pageTreeError: null,
@@ -457,6 +460,10 @@ export default {
 
             return ids;
         },
+
+        siteOptions() {
+            return this.sites.map((site) => ({ value: site.handle, label: site.name }));
+        },
     },
 
     watch: {
@@ -484,6 +491,14 @@ export default {
                     this.urlData[this.linkType] ? `${this.linkType}:${this.urlData[this.linkType]}` : null,
                 );
             },
+        },
+
+        selectedSite(site, oldSite) {
+            if (! oldSite || site === oldSite) {
+                return;
+            }
+
+            this.loadPages(site);
         },
     },
 
@@ -717,16 +732,18 @@ export default {
             return { ref, type, id };
         },
 
-        async loadPages() {
+        async loadPages(site = this.selectedSite) {
             this.pageTreeLoading = true;
             this.pageTreeError = null;
 
             try {
                 const url = this.addonConfig.pageLinkTreeUrl || cp_url('api/statamic-cp-tree/page-link-tree');
-                const response = await this.$axios.get(url);
+                const response = await this.$axios.get(url, { params: site ? { site } : {} });
 
                 this.pages = response.data.pages || [];
+                this.sites = response.data.sites || [];
                 this.pageTreeSite = response.data.site || 'default';
+                this.selectedSite = this.pageTreeSite;
                 this.openIds = this.initialOpenIds(this.pages);
 
                 const { id } = this.parseDataUrl(this.url.entry || this.url.page);

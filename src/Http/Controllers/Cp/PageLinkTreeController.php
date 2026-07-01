@@ -31,7 +31,25 @@ class PageLinkTreeController extends Controller
         return response()->json([
             'pages' => $this->cachedTree($collection, $site->handle()),
             'site' => $site->handle(),
+            'sites' => $this->authorizedSites($collection),
         ]);
+    }
+
+    /**
+     * @return list<array{handle: string, name: string}>
+     */
+    private function authorizedSites(\Statamic\Contracts\Entries\Collection $collection): array
+    {
+        return $collection->sites()
+            ->map(fn (string $handle) => Site::get($handle))
+            ->filter()
+            ->filter(fn ($site) => User::current()->can('view', $site))
+            ->map(fn ($site) => [
+                'handle' => $site->handle(),
+                'name' => $site->name(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
