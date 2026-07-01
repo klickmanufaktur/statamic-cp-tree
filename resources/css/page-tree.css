@@ -598,7 +598,7 @@
 
 .page-link-fieldtype__site-select {
     flex: 0 0 auto;
-    min-width: 9rem;
+    min-width: 10rem;
 }
 
 .page-node-access-fieldtype__scroll {

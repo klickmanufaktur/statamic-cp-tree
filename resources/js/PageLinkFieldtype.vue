@@ -84,6 +84,10 @@
                         <Select
                             v-if="sites.length > 1"
                             class="page-link-fieldtype__site-select"
+                            icon="globe-world-wide-web"
+                            aria-label="Site wechseln"
+                            v-tooltip="'Site wechseln'"
+                            adaptive-width
                             :options="siteOptions"
                             v-model="selectedSite"
                         />
@@ -249,8 +253,8 @@ const PageLinkTreeNode = {
                     :label="pageTitle"
                     @click.stop
                 >
-                    <StatusIndicator :status="node.status || 'draft'" :show-label="false" />
                     <span class="statamic-cp-tree__title">
+                        <StatusIndicator :status="node.status || 'draft'" :show-label="false" />
                         <Icon v-if="depth === 1 && node.slug === 'home'" name="home" class="statamic-cp-tree__home" aria-hidden="true" />
                         {{ pageTitle }}
                     </span>

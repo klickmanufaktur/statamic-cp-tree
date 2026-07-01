@@ -83,7 +83,7 @@
             <StackContent inset>
                 <div class="statamic-cp-tree page-link-fieldtype__tree">
                     <div class="page-node-access-fieldtype__header page-node-access-fieldtype__header--stack">
-                        <Select v-if="sites.length > 1" class="page-link-fieldtype__site-select" :options="siteOptions" v-model="selectedSite" />
+                        <Select v-if="sites.length > 1" class="page-link-fieldtype__site-select" icon="globe-world-wide-web" aria-label="Site wechseln" v-tooltip="'Site wechseln'" adaptive-width :options="siteOptions" v-model="selectedSite" />
                         <Input class="page-node-access-fieldtype__search" v-model="searchQuery" icon-prepend="magnifying-glass" placeholder="Seiten suchen" clearable :append="searchAppendText" />
                         <div class="page-node-access-fieldtype__tools">
                             <Button size="sm" icon="tree-collapse" text="Alle schließen" @click="collapseAll" />
@@ -199,8 +199,8 @@ const PageLinkTreeNode = {
 
             <div class="statamic-cp-tree__row page-link-fieldtype__row" role="button" tabindex="0" :aria-pressed="String(isSelected)" @click="selectPage" @keydown.enter.prevent="selectPage" @keydown.space.prevent="selectPage">
                 <Radio class="page-link-fieldtype__radio" :value="entryId" :label="pageTitle" @click.stop>
-                    <StatusIndicator :status="node.status || 'draft'" :show-label="false" />
                     <span class="statamic-cp-tree__title">
+                        <StatusIndicator :status="node.status || 'draft'" :show-label="false" />
                         <Icon v-if="depth === 1 && node.slug === 'home'" name="home" class="statamic-cp-tree__home" aria-hidden="true" />
                         {{ pageTitle }}
                     </span>
