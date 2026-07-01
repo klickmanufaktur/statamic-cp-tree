@@ -11,6 +11,7 @@ use Statamic\Facades\Collection;
 use Statamic\Facades\Site;
 use Statamic\Facades\User;
 use Statamic\Structures\TreeBuilder;
+use StatamicCpTree\Support\PageLinkTreeCache;
 
 class PageLinkTreeController extends Controller
 {
@@ -38,19 +39,16 @@ class PageLinkTreeController extends Controller
      * Picker-Open hängen, und mehrere Felder gleichzeitig vervielfachen das. Das
      * Ergebnis wird daher pro Collection/Site/User gecacht und mit einem Lock
      * gegen parallele Cold-Builds (Stampede) abgesichert: nur eine Anfrage baut,
-     * die übrigen warten kurz und lesen dann aus dem Cache.
+     * die übrigen warten kurz und lesen dann aus dem Cache. Der Cache-Key enthält
+     * eine Versionsnummer (siehe PageLinkTreeCache), die FlushPageLinkTreeCache bei
+     * Entry- oder Baum-Änderungen hochzählt, damit Änderungen sofort sichtbar sind.
      *
      * @return list<array<string, mixed>>
      */
     private function cachedTree(\Statamic\Contracts\Entries\Collection $collection, string $site): array
     {
-        $cacheKey = implode(':', [
-            'statamic-cp-tree',
-            'page-link-tree',
-            $collection->handle(),
-            $site,
-            User::current()?->id() ?? 'guest',
-        ]);
+        $user = (string) (User::current()?->id() ?? 'guest');
+        $cacheKey = PageLinkTreeCache::key($collection->handle(), $site, $user);
 
         if (($cached = Cache::get($cacheKey)) !== null) {
             return $cached;
@@ -63,7 +61,7 @@ class PageLinkTreeController extends Controller
         );
 
         try {
-            return Cache::lock($cacheKey.':lock', 20)->block(15, $remember);
+            return Cache::lock(PageLinkTreeCache::lockKey($collection->handle(), $site, $user), 20)->block(15, $remember);
         } catch (LockTimeoutException) {
             return $this->buildTree($collection, $site);
         }

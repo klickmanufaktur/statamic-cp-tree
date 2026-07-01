@@ -2,13 +2,25 @@
 
 namespace StatamicCpTree;
 
+use Statamic\Events\CollectionTreeDeleted;
+use Statamic\Events\CollectionTreeSaved;
+use Statamic\Events\EntryDeleted;
+use Statamic\Events\EntrySaved;
 use Statamic\Providers\AddonServiceProvider;
 use Statamic\Statamic;
+use StatamicCpTree\Listeners\FlushPageLinkTreeCache;
 
 class ServiceProvider extends AddonServiceProvider
 {
     protected $routes = [
         'cp' => __DIR__.'/../routes/cp.php',
+    ];
+
+    protected $listen = [
+        EntrySaved::class => [FlushPageLinkTreeCache::class],
+        EntryDeleted::class => [FlushPageLinkTreeCache::class],
+        CollectionTreeSaved::class => [FlushPageLinkTreeCache::class],
+        CollectionTreeDeleted::class => [FlushPageLinkTreeCache::class],
     ];
 
     protected $vite = [
