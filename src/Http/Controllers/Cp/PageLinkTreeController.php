@@ -2,9 +2,11 @@
 
 namespace StatamicCpTree\Http\Controllers\Cp;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
 use Statamic\Facades\Collection;
 use Statamic\Facades\Site;
 use Statamic\Facades\User;
@@ -24,18 +26,63 @@ class PageLinkTreeController extends Controller
         abort_unless(User::current()?->can("view {$collection->handle()} entries"), 403);
 
         $site = Site::get((string) $request->query('site')) ?? Site::current();
+
+        return response()->json([
+            'pages' => $this->cachedTree($collection, $site->handle()),
+            'site' => $site->handle(),
+        ]);
+    }
+
+    /**
+     * Der Baum-Build ist teuer (~0,7–5 s). Pro Anfrage neu zu bauen lässt jeden
+     * Picker-Open hängen, und mehrere Felder gleichzeitig vervielfachen das. Das
+     * Ergebnis wird daher pro Collection/Site/User gecacht und mit einem Lock
+     * gegen parallele Cold-Builds (Stampede) abgesichert: nur eine Anfrage baut,
+     * die übrigen warten kurz und lesen dann aus dem Cache.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function cachedTree(\Statamic\Contracts\Entries\Collection $collection, string $site): array
+    {
+        $cacheKey = implode(':', [
+            'statamic-cp-tree',
+            'page-link-tree',
+            $collection->handle(),
+            $site,
+            User::current()?->id() ?? 'guest',
+        ]);
+
+        if (($cached = Cache::get($cacheKey)) !== null) {
+            return $cached;
+        }
+
+        $remember = fn (): array => Cache::remember(
+            $cacheKey,
+            now()->addMinutes(5),
+            fn (): array => $this->buildTree($collection, $site),
+        );
+
+        try {
+            return Cache::lock($cacheKey.':lock', 20)->block(15, $remember);
+        } catch (LockTimeoutException) {
+            return $this->buildTree($collection, $site);
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function buildTree(\Statamic\Contracts\Entries\Collection $collection, string $site): array
+    {
         $pages = $collection->structure()
             ? (new TreeBuilder)->buildForController([
                 'structure' => $collection->structure(),
                 'include_home' => true,
-                'site' => $site->handle(),
+                'site' => $site,
             ])
             : [];
 
-        return response()->json([
-            'pages' => $this->filterTree($pages, $site->handle()),
-            'site' => $site->handle(),
-        ]);
+        return $this->filterTree($pages, $site);
     }
 
     private function accessResolver(): ?object

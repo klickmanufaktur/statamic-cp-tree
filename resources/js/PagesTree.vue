@@ -145,10 +145,12 @@ import {
     PanelHeader,
     StatusIndicator,
 } from '@statamic/cms/ui';
+import { router } from '@statamic/cms/inertia';
 
 const STORAGE_KEY_PREFIX = 'statamic.cp_tree.open_ids';
 const PAGES_CACHE_KEY_PREFIX = 'statamic.cp_tree.pages';
 const FILTER_KEY_PREFIX = 'statamic.cp_tree.filter_id';
+const PAGES_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const DropdownPageActionMenu = {
     name: 'DropdownPageActionMenu',
@@ -490,6 +492,21 @@ const TreeNode = {
             }
         },
 
+        editPage(event) {
+            const url = this.node.edit_url;
+
+            if (! url) {
+                return;
+            }
+
+            if (event.metaKey || event.ctrlKey) {
+                window.open(url);
+                return;
+            }
+
+            router.get(url);
+        },
+
         startDrag(event) {
             if (! this.canDrag) {
                 event.preventDefault();
@@ -585,7 +602,7 @@ const TreeNode = {
             >
                 <Context side="bottom" align="start">
                     <template #trigger>
-                        <a :href="node.edit_url" class="statamic-cp-tree__main-action">
+                        <a :href="node.edit_url" class="statamic-cp-tree__main-action" @click.prevent.stop="editPage">
                             <StatusIndicator :status="node.status || 'draft'" :show-label="false" />
 
                             <span class="statamic-cp-tree__title">
@@ -813,7 +830,7 @@ export default {
         },
 
         editable() {
-            return Boolean(this.pageProps.canEdit);
+            return Boolean(this.pageProps.structured ?? this.pageProps.canEdit);
         },
 
         treeEditable() {
@@ -929,25 +946,33 @@ export default {
             this.loading = true;
 
             try {
-                const flagsResponse = await this.$axios
-                    .get(`${this.pagesFlagsUrl}?collection=${encodeURIComponent(this.collectionHandle)}&site=${this.site}`)
-                    .catch(() => ({ data: { flags: {}, cache_key: 'unknown' } }));
+                const latestCachedPages = this.restoreLatestPagesCache();
 
-                this.pageAccessRestricted = Boolean(flagsResponse.data.restricted);
-                this.pageAccessCacheKey = flagsResponse.data.cache_key || 'unknown';
-
-                const cachedPages = this.restorePagesCache();
-
-                if (cachedPages) {
-                    this.applyLoadedPages(cachedPages);
+                if (latestCachedPages) {
+                    this.applyLoadedPages(latestCachedPages);
                     this.applyFilterNode();
                     this.applyOpenIds();
                     this.loading = false;
                 }
 
-                const treeResponse = await this.$axios.get(`${this.pagesUrl}?site=${this.site}`);
+                const [flagsResponse, treeResponse] = await Promise.all([
+                    this.$axios
+                        .get(`${this.pagesFlagsUrl}?collection=${encodeURIComponent(this.collectionHandle)}&site=${this.site}`)
+                        .catch(() => ({ data: { flags: {}, cache_key: 'unknown' } })),
+                    this.$axios.get(`${this.pagesUrl}?site=${this.site}`),
+                ]);
 
                 this.pageAccessRestricted = Boolean(treeResponse.data.access_restricted || flagsResponse.data.restricted);
+                this.pageAccessCacheKey = flagsResponse.data.cache_key || 'unknown';
+
+                const cachedPages = this.restorePagesCache();
+
+                if (cachedPages && ! latestCachedPages) {
+                    this.applyLoadedPages(cachedPages);
+                    this.applyFilterNode();
+                    this.applyOpenIds();
+                    this.loading = false;
+                }
 
                 const pages = this.pageAccessRestricted
                     ? this.filterPagesByAllowedIds(treeResponse.data.pages || [], flagsResponse.data.allowed_ids || [])
@@ -1522,6 +1547,14 @@ export default {
             return `${PAGES_CACHE_KEY_PREFIX}.${this.collectionHandle}.${this.site || 'default'}.${this.pageAccessCacheKey}`;
         },
 
+        latestPagesCacheKey() {
+            return `${PAGES_CACHE_KEY_PREFIX}.${this.collectionHandle}.${this.site || 'default'}.${this.currentUserCacheKey()}.latest`;
+        },
+
+        currentUserCacheKey() {
+            return Statamic.user?.id || Statamic.user?.email || 'guest';
+        },
+
         restorePagesCache() {
             try {
                 const value = window.sessionStorage.getItem(this.pagesCacheKey());
@@ -1532,9 +1565,52 @@ export default {
             }
         },
 
+        restoreLatestPagesCache() {
+            try {
+                const sessionValue = window.sessionStorage.getItem(this.latestPagesCacheKey());
+
+                if (sessionValue) {
+                    return JSON.parse(sessionValue);
+                }
+
+                const persistedValue = window.localStorage.getItem(this.latestPagesCacheKey());
+
+                if (! persistedValue) {
+                    return null;
+                }
+
+                const persisted = JSON.parse(persistedValue);
+
+                if (Array.isArray(persisted)) {
+                    return persisted;
+                }
+
+                if (
+                    ! Array.isArray(persisted?.pages)
+                    || typeof persisted.cached_at !== 'number'
+                    || Date.now() - persisted.cached_at > PAGES_CACHE_MAX_AGE_MS
+                ) {
+                    window.localStorage.removeItem(this.latestPagesCacheKey());
+
+                    return null;
+                }
+
+                return persisted.pages;
+            } catch (error) {
+                return null;
+            }
+        },
+
         persistPagesCache() {
             try {
-                window.sessionStorage.setItem(this.pagesCacheKey(), JSON.stringify(this.pages));
+                const pages = JSON.stringify(this.pages);
+
+                window.sessionStorage.setItem(this.pagesCacheKey(), pages);
+                window.sessionStorage.setItem(this.latestPagesCacheKey(), pages);
+                window.localStorage.setItem(this.latestPagesCacheKey(), JSON.stringify({
+                    cached_at: Date.now(),
+                    pages: this.pages,
+                }));
             } catch (error) {}
         },
 
